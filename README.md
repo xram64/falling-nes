@@ -5,7 +5,7 @@
 
 Falling is a simple NES game written in 6502 assembly.
 
-This is my first go at both assembly programming and designing an entire game from scratch. The project took 11 days and 130+ hours.
+This is my first go at both assembly programming and designing an entire game from scratch. Start to finish, the project took 130+ hours over 11 days.
 
 ### Usage
 To play, `falling.nes` can be loaded into an NES emulator such as FCEUX or Bizhawk.
