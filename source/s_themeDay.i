@@ -1,4 +1,4 @@
-themeDayTempo = $66  ; starting tempo (180 bpm)
+themeDayTempo = $64  ; starting tempo (175 bpm)
 ;; Stream header format:
  ; 
  ; Stream number (MUSIC_SQ1, MUSIC_SQ2, MUSIC_TRI, MUSIC_NOI, SFX_1, or SFX_2)
@@ -15,7 +15,7 @@ themeDay_header:
   .db MUSIC_SQ1
   .db $01
   .db SQUARE_1
-  .db %01110000
+  .db %10110000
   .db ve_stac2
   .dw themeDay_square1
   .db themeDayTempo
@@ -89,6 +89,7 @@ themeDay_square2:
   
 .infloop
 
+  ; section 1 (12 bars)
   .db n_32, C5, D5, n_d8, E5, n_4, E5, G4
   .db n_2, D5, n_4, C5
   .db n_d2, A4
@@ -108,7 +109,27 @@ themeDay_square2:
   .db E5, D5, B4
   .db n_d2, C5, rr
   
-
+  ; section 2 (12 bars)
+  .db n_32, C5, D5, n_d8, E5, n_4, E5, G4
+  .db n_2, D5, n_4, C5
+  .db n_d2, A4
+  .db rr
+  
+  .db n_4, E4, A4, C5
+  .db n_4, E5, D5, C5
+  .db n_d2, G5
+  .db n_4, F5, E5, D5
+  
+  .db n_2, E5, n_4, C5
+  .db n_2, D5, n_4, C5
+  .db n_2, E5, n_4, D5
+  .db n_4, C5, B4, A4
+  
+  .db n_4, G4, C5, D5
+  .db E5, D5, B4
+  .db n_d2, C5, rr
+  
+  
   .db inf_loopto
   .dw .infloop
   .db endsound
@@ -122,7 +143,7 @@ themeDay_tri:
   .db n_4, rr, n_8, C5, rr, C5, rr
   
 .infloop
-
+  ; section 1 (12 bars)
   .db n_4, rr, n_8, A5, Gs5, A5, rr
   .db n_4, rr, n_8, A5, Gs5, A5, rr
   .db n_4, rr, n_8, B5, As5, B5, rr
@@ -142,7 +163,28 @@ themeDay_tri:
   .db n_4, rr, n_8, B5, As5, B5, rr
   .db n_8, rr, rr, E6, rr, E6, rr
   .db n_4, C6, rr, rr
-
+  
+  ; section 2 (12 bars)
+  .db n_4, rr, n_8, A5, Gs5, A5, rr
+  .db n_4, rr, n_8, A5, Gs5, A5, rr
+  .db n_4, rr, n_8, B5, As5, B5, rr
+  .db n_4, rr, n_8, B5, As5, B5, rr
+  
+  .db n_4, rr, n_8, D6, Cs6, D6, rr
+  .db n_4, rr, n_8, A5, Gs5, A5, rr
+  .db n_4, rr, n_8, As5, rr, As5, rr	; only change
+  .db n_4, B5, rr, rr					; only change
+  
+  .db n_4, rr, n_8, G5, Fs5, G5, rr
+  .db n_4, rr, n_8, G5, Fs5, G5, rr
+  .db n_4, rr, n_8, B5, As5, B5, rr
+  .db n_4, rr, n_8, B5, As5, B5, rr
+  
+  .db n_4, rr, n_8, D6, Cs6, D6, rr
+  .db n_4, rr, n_8, B5, As5, B5, rr
+  .db n_8, rr, rr, E6, rr, E6, rr
+  .db n_4, C6, rr, rr
+  
   .db inf_loopto
   .dw .infloop
   .db endsound

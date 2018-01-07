@@ -1,6 +1,5 @@
 ;;;; Sound Engine (FALLING) ;;;;
-
-;; Data stream formatting (based on http://nintendoage.com/forum/messageview.cfm?catid=22&threadid=23452)
+;; Based on Nerdy Nights Sound tutorial (http://nintendoage.com/forum/messageview.cfm?catid=22&threadid=23452)
 ; Sound is organized into 6 streams, including 4 dedicated music streams, and two SFX streams.
 ; Music/SFX streams are listed by priority.
 ; Streams with higher indices have higher priority and will overwrite the data coming in from lower priority streams.
@@ -825,7 +824,7 @@ song_headers:
   
   
   ;.dw drumtest_header
-  .dw noisetest_header
+  ;.dw noisetest_header
   ;.dw envtest_header
   
   
@@ -844,7 +843,7 @@ song_headers:
 
   
   ;.include "s_drumtest.i"
-  .include "s_noisetest.i"
+  ;.include "s_noisetest.i"
   ;.include "s_envtest.i"
 
 ; Song aliases
