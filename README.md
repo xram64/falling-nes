@@ -14,7 +14,7 @@ To assemble from source, run `NESASM3 falling.asm` using the NESASM v3.1 assembl
 - The [Nesdev Wiki](https://wiki.nesdev.com/w/index.php/Nesdev_Wiki) programming and reference guides
 
 ## Utilities
-- [NESASM v3.1](https://github.com/camsaul/nesasm) for assembling
+- [NESASM v3.1](http://www.nespowerpak.com/nesasm/NESASM3.zip) for assembling [(source)](https://github.com/camsaul/nesasm)
 - [YY-CHR Sprite Editor](https://www.romhacking.net/utilities/119/) for creating sprites and backgrounds
 
 ## Other References
