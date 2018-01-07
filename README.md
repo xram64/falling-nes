@@ -1,6 +1,9 @@
+
+![Falling Title](assets/TitleCard.png)
+
 # falling-nes
 
-Falling is an NES game written in 6502 assembly.
+Falling is a simple NES game written in 6502 assembly.
 
 This is my first go at both assembly programming and designing an entire game from scratch. The project took 11 days and 130+ hours.
 
