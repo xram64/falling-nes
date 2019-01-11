@@ -10,7 +10,7 @@
  ; 
  ;              v---------\
  ;  TITLE -> PLAYING -> PAUSED
- ; 		  		   -> GAME OVER
+ ; 		  		   	 -> GAME OVER
  ;     ^------------------/
 
 ;; RAM Layout:
@@ -29,7 +29,6 @@
  
 ;; TODO:
 ; - Add distinct features to Day/Sunset/Night modes: Day=normal, Sunset=slow and chill, Night=hardcore(?)
-; - Test on standard emulators
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -51,6 +50,11 @@ buttons			.rs 1  ; player 1 gamepad buttons, one bit per button
 gamemode		.rs 1  ; game mode (0=Day, 1=Sunset, 2=Night)
 difficulty		.rs 1  ; difficulty (0=Easy, 1=Medium, 2=Hard, 3=Insane)
 difficultyflag	.rs 1  ; flag to indicate that difficulty should no longer change (1=max difficulty reached)
+
+diff_coarse		.rs 1  ; coarse number of pixels to move per frame
+diff_fine		.rs 1  ; fine number of fractional pixels to move per frame (fraction of diff_incrate)
+diff_incrate	.rs 1  ; rate that controls how quickly falling speed will change during a level
+diff_framespeed .rs 1  ; number of pixels that objects should move this frame. Should be a divisor of 256, otherwise, speeds will be slower than expected.
 
 ppu_cr1			.rs 1  ; state of PPU Control Register 1 ($2000, PPUCTRL)
 ppu_cr2			.rs 1  ; state of PPU Control Register 2 ($2001, PPUMASK)
@@ -109,19 +113,6 @@ temp_dec		.rs 5
 sound_ptr		.rs 2  ; address pointer used by sound engine for indirect addressing (must be on zero-page)
 sound_cur_song	.rs 1  ; index of currently playing song
 
-; Masks for BIT instructions in button scripts (BIT masks use variables instead of constants due to BIT opcode issue)
-MASK_A			.rs 1
-MASK_B			.rs 1
-MASK_SELECT		.rs 1
-MASK_START		.rs 1
-MASK_UP			.rs 1
-MASK_DOWN		.rs 1
-MASK_LEFT		.rs 1
-MASK_RIGHT		.rs 1
-
-PKUP_COLL_LIFE	.rs 1  ; masks for pkupcollisions
-PKUP_COLL_COIN	.rs 1  ; *BIT masks use variables instead of constants due to BIT opcode issue
-
 ;; DECLARE CONSTANTS
 STATETITLE		= $00  ; displaying title screen
 STATEPLAYING	= $01  ; playing game
@@ -153,6 +144,9 @@ PKUPLIFEY_INIT	= $F2
 PKUPCOINX_INIT	= $A0
 PKUPCOINY_INIT	= $FF
 
+PKUP_COLL_LIFE 	= %10000000  ; masks for pkupcollisions
+PKUP_COLL_COIN 	= %01000000
+
 UI_CUTOFF		= $14  ; bottom pixel of UI elements. no game objects should go above this y-pos.
 
 UI_LIVESX		= $F0  ; lives counter position
@@ -178,6 +172,16 @@ PAUSED_TEXTY	= $60
 ;PAUSED_PPCR2	= %10000001  ; XORed with state of PPUMASK to create a pause gray-out. (grayscale + intensify reds)
 GAMEOVER_TEXTX	= $5C
 GAMEOVER_TEXTY	= $60
+
+; Masks for BIT instructions in button scripts (BIT instruction does not support immed. addressing, so LDA these before use)
+MASK_A			= %10000000
+MASK_B			= %01000000
+MASK_SELECT		= %00100000
+MASK_START		= %00010000
+MASK_UP			= %00001000
+MASK_DOWN		= %00000100
+MASK_LEFT		= %00000010
+MASK_RIGHT		= %00000001
 
 ;;;;;;;;;;;;;;;;;;
 
@@ -254,28 +258,6 @@ clrmem:
   LDA #PKUPCOINY_INIT
   STA pkupcoin_y
   
-  ; Set mask "constants"
-  LDA #%10000000
-  STA PKUP_COLL_LIFE
-  LDA #%01000000
-  STA PKUP_COLL_COIN
-  
-  LDA #%10000000
-  STA MASK_A
-  LDA #%01000000
-  STA MASK_B
-  LDA #%00100000
-  STA MASK_SELECT
-  LDA #%00010000
-  STA MASK_START
-  LDA #%00001000
-  STA MASK_UP
-  LDA #%00000100
-  STA MASK_DOWN
-  LDA #%00000010
-  STA MASK_LEFT
-  LDA #%00000001
-  STA MASK_RIGHT
 
 ;; Sprite data only needs to be fully loaded once, here.
 LoadSprites:
@@ -387,8 +369,8 @@ NTSwapCheckDone:
   JSR ReadController	; get the current button data for player 1
   
 ;; Check for Start button
-  LDA buttons
-  BIT MASK_START			; get Start button, bit is 1 (Z=0) if start is pressed
+  LDA #MASK_START
+  BIT buttons				; get Start button, bit is 1 (Z=0) if start is pressed
   BNE StartCheck_StartPressed  ; branch if Z=0
   LDA #$00
   CMP startlatch			; check state of startlatch
@@ -624,8 +606,8 @@ EngineTitle:
   
   
 EngineTitle_ButtonUp:
-  LDA buttons
-  BIT MASK_UP					; get Up button
+  LDA #MASK_UP
+  BIT buttons					; get Up button
   BEQ EngineTitle_ButtonDown	; skip if bit is 0 (Z=1). if we branch here, Up was not pressed
   LDA #$00
   CMP buttonlatch				; check if a button is still being held down
@@ -640,8 +622,8 @@ EngineTitle_ButtonUpCont:
   STA buttonlatch				; engage buttonlatch, indicating a button is being held down
   JMP EngineTitle_ButtonDone	; if Up is pressed, don't check Down
 EngineTitle_ButtonDown:
-  LDA buttons
-  BIT MASK_DOWN					; get Down button
+  LDA #MASK_DOWN
+  BIT buttons					; get Down button
   BEQ EngineTitle_NoUpDown		; skip if bit is 0 (Z=1). if we branch here, Up/Down were not pressed
   LDA #$00
   CMP buttonlatch				; check if a button is still being held down
@@ -1102,6 +1084,15 @@ EnginePlayingInit_T_LoadBG:
   STA playerscore+0
   STA playerscore+1					; reset score
   
+;; Set initial diff values ;;
+;; TODO: a way to change these
+  STA diff_fine
+  LDA #1
+  STA diff_coarse
+  LDA #64
+  STA diff_incrate
+  
+  
 ;; Show game sprites ;;
   LDX #$00  
 EngineTitleInit_ShowSpritesLoop:
@@ -1251,6 +1242,52 @@ EnginePlaying:
 ;; Advance clocks
   JSR ClockStep
   
+  
+;;;; TODO: REMOVE BOTH DIFFICULTY SCRIPTS AND REPLACE WITH SUBPIXEL MOVEMENT SYSTEM
+  
+;; ALT DIFFICULTY UPDATE (WIP)
+;; Difficulty curve: Obstacles move at an average of X + R/N pixels per frame where X is the number of full frame steps taken every second,
+;;   N is # of seconds since level start, and R is the difficultyrate.
+;; We increase fine falling speed every second according to difficultyrate.
+;; The difficultyrate represents the number of seconds it takes to increase one full speed step (frame/sec)
+;; For instance, if difficultyrate = 60, we will move from 1 frame/sec to 2 frames/sec after 60 seconds.
+;; The difficulty will increment from 0 to difficultyrate every second until wrapping.
+;; When difficulty wraps, a full frame/sec will be added to fall rate, and fine steps will reset.
+;; We will use rng to simulate fractional speed steps: a 1/N roll will be made on every frame to determine whether we should move an additional frame.
+
+  
+  LDA clock60		; increment diff variables once every second
+  BNE .DoneDiffUpdate
+  
+  INC diff_fine		; advance fine speed
+  LDA diff_incrate  ; if diff_fine has reached diff_incrate, wrap it and increment diff_coarse
+  CMP diff_fine
+  BCS .DoneDiffUpdate  ; (branch if diff_incrate >= diff_fine)
+  LDA #$00 		
+  STA diff_fine		; if diff_fine has reached diff_incrate, set it back to 0
+  INC diff_coarse
+.DoneDiffUpdate
+
+
+;; Determine how many pixels to move objects this frame
+  JSR prng
+  LDY diff_incrate
+  JSR mod				; get an rng and mod it by diff_incrate
+  CMP diff_fine
+  BCS .NoDoubleMove		; if it is < diff_fine, don't add an extra frame to diff_coarse
+  LDA #$01				; if it is >= diff_fine, add an extra frame to diff_coarse
+  JMP .DoubleMove
+.NoDoubleMove
+  LDA #$00
+.DoubleMove
+  CLC
+  ADC diff_coarse		; whether we added an extra frame or not, add diff_coarse frames
+  STA diff_framespeed	; store the number of pixels objects should move this frame
+  
+  
+  
+  
+  
 ;; Difficulty update
   LDA difficultyflag			; check difficultyflag. if not 0, don't update
   BNE DifficultyCurveNoChange	; if flag is 0, we can't raise difficulty any more, so quit
@@ -1311,8 +1348,8 @@ CharMove:
 
 
 ButtonLeft:
-  LDA buttons
-  BIT MASK_LEFT		; get Left button
+  LDA #MASK_LEFT
+  BIT buttons		; get Left button
   BEQ ButtonRight	; skip if bit is 0 (Z=1)
   LDA playerx
   LDX difficulty	; get difficulty index
@@ -1322,8 +1359,8 @@ ButtonLeft:
   LDA #$00
   STA playerfacing
 ButtonRight:
-  LDA buttons
-  BIT MASK_RIGHT	; get Right button
+  LDA #MASK_RIGHT
+  BIT buttons		; get Right button
   BEQ ButtonUp		; skip if bit is 0 (Z=1)
   LDA playerx
   LDX difficulty	; get difficulty index
@@ -1333,16 +1370,16 @@ ButtonRight:
   LDA #$01
   STA playerfacing
 ButtonUp:			;; reenable to allow up/down movement
-  ;LDA buttons
-  ;BIT MASK_UP		; get Up button
+  ;LDA #MASK_UP
+  ;BIT buttons		; get Up button
   ;BEQ ButtonDown	; skip if bit is 0 (Z=1)
   ;LDA playery
   ;SEC
   ;SBC #PLAYERBASESPEED
   ;STA playery
 ButtonDown:			;; reenable to allow up/down movement
-  ;LDA buttons
-  ;BIT MASK_DOWN		; get Down button
+  ;LDA #MASK_DOWN
+  ;BIT buttons		; get Down button
   ;BEQ ButtonDone	; skip if bit is 0 (Z=1)
   ;LDA playery
   ;CLC
@@ -2049,8 +2086,8 @@ Pkup_CollisionConfirmed:
   
 ;; Extra life
   ; Check for extra life pickup
-  LDA pkupcollisions
-  BIT PKUP_COLL_LIFE		; returns Z=0 (not equal) if flag is set
+  LDA #PKUP_COLL_LIFE
+  BIT pkupcollisions		; returns Z=0 (not equal) if flag is set
   BNE Pkup_CollisionConf_Life
   JMP Pkup_CollisionConf_LifeDone
 
@@ -2092,8 +2129,8 @@ Pkup_CollisionConf_LifeDone:
 
 ;; Coin
 ; Check for coin pickup
-  LDA pkupcollisions
-  BIT PKUP_COLL_COIN		; returns Z=0 (not equal) if flag is set
+  LDA #PKUP_COLL_COIN
+  BIT pkupcollisions		; returns Z=0 (not equal) if flag is set
   BNE Pkup_CollisionConf_Coin
   JMP Pkup_CollisionConf_CoinDone
 
@@ -2186,7 +2223,7 @@ Pkup_LifeCollision:
   CPY #$01
   BNE Pkup_LifeCollisionDone	; if flag is not set, skip check
   LDA pkuplife_x				; otherwise, prepare A and X
-  LDX PKUP_COLL_LIFE
+  LDX #PKUP_COLL_LIFE
   JSR Pkup_CollisionXCheck  	; check collision
 Pkup_LifeCollisionDone:
 
@@ -2198,7 +2235,7 @@ Pkup_CoinCollision:
   CPY #$01
   BNE Pkup_CoinCollisionDone	; if flag is not set, skip check
   LDA pkupcoin_x				; otherwise, prepare A and X
-  LDX PKUP_COLL_COIN
+  LDX #PKUP_COLL_COIN
   JSR Pkup_CollisionXCheck  	; check collision
 Pkup_CoinCollisionDone:
 
@@ -2387,8 +2424,9 @@ Obst_Init:
   
 ;; Move y-positions of all sprites in an obstacle up by obstspeed (obstacle passed in through X)
 Obst_MoveUp:
-  LDY difficulty
-  LDA diff_obstspeed, y
+  ;;LDY difficulty
+  ;;LDA diff_obstspeed, y
+  LDA diff_framespeed
   STA tempvar1					; store obstacle speed
   LDY #0
   ; runs 4 times, once for each sprite in obstacle object
