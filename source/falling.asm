@@ -1,3 +1,11 @@
+;==========================================================;
+; =#= TITLE:   Falling									   ;
+; =#= VERSION: 1.1										   ;
+; =#= AUTHOR:  Jesse Williams (@tragicmuffin)  			   ;
+; =#= LINK:    https://github.com/vblank182/falling-nes    ;
+; =#= SYNTAX:  NESASM3									   ;
+;==========================================================;
+
   .inesprg 2   ; 2x 16KB PRG code banks (banks 0, 1, 2, 3)
   .ineschr 1   ; 1x  8KB CHR data banks (bank 4)
   .inesmap 0   ; mapper (0 = NROM), no bank swapping
@@ -29,6 +37,12 @@
  
 ;; TODO:
 ; - Add distinct features to Day/Sunset/Night modes: Day=normal, Sunset=slow and chill, Night=hardcore(?)
+; - Rewrite screen scrolling to use subpixel system
+; - Add variable tempo for music to speed up with difficulty increase
+; - [DRY] Combine/generalize pickup spawning and rolling procedures
+; - [MAJ] Add BG text system and rewrite top UI to use it instead of sprites
+;   - Add multiplier to show current difficulty level and multiply current score by it
+; - Make life and coin pickups move at different rates. Add a small subpixel offset to life pickup speeds.
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -45,24 +59,29 @@ rng				.rs 2  ; 16-bit seed for 8-bit random number (in rng+0)
 clock100		.rs 1  ; frame counter: rolls over every 100 frames
 clock256		.rs 1  ; frame counter: rolls over every 256 frames
 clock60			.rs 1  ; frame counter: rolls over every 60 frames (one second)
-clockSecs		.rs 4  ; second counter: increments every 60 frames to track seconds (overflows after 136.2 years)
+clockSecs		.rs 4  ; second counter: increments every 60 frames to track seconds (overflows after 136.2 years) (resets on menu)
 buttons			.rs 1  ; player 1 gamepad buttons, one bit per button
 gamemode		.rs 1  ; game mode (0=Day, 1=Sunset, 2=Night)
-difficulty		.rs 1  ; difficulty (0=Easy, 1=Medium, 2=Hard, 3=Insane)
+difficulty		.rs 1  ; difficulty
 difficultyflag	.rs 1  ; flag to indicate that difficulty should no longer change (1=max difficulty reached)
 
-diff_coarse		.rs 1  ; coarse number of pixels to move per frame
-diff_fine		.rs 1  ; fine number of fractional pixels to move per frame (fraction of diff_incrate)
-diff_incrate	.rs 1  ; rate that controls how quickly falling speed will change during a level
-diff_framespeed .rs 1  ; number of pixels that objects should move this frame. Should be a divisor of 256, otherwise, speeds will be slower than expected.
+; diff_coarse		.rs 1  ; coarse number of pixels to move per frame
+; diff_fine		.rs 1  ; fine number of fractional pixels to move per frame (fraction of diff_incrate)
+; diff_incrate	.rs 1  ; rate that controls how quickly falling speed will change during a level
+; diff_framespeed .rs 1  ; number of pixels that objects should move this frame. Should be a divisor of 256, otherwise, speeds will be slower than expected.
 
 ppu_cr1			.rs 1  ; state of PPU Control Register 1 ($2000, PPUCTRL)
 ppu_cr2			.rs 1  ; state of PPU Control Register 2 ($2001, PPUMASK)
 ppu_scroll		.rs 1  ; current background scroll position (should only go to 240)
 ppu_nametable	.rs 1  ; current nametable priority (0 or 2) for swapping while scrolling
 
-playerx			.rs 1  ; player char, horizontal position of midpoint between feet
-playery			.rs 1  ; player char, vertical position of midpoint between feet
+; Player position based on midpoint between character feet at bottom edge of sprites.
+; Subpixel positions have a resolution of 1/256 pixels
+playerx			.rs 1  ; player position, horizontal pixel
+playery			.rs 1  ; player position, vertical pixel
+playerx_sub		.rs 1  ; player position, horizontal subpixel
+playery_sub		.rs 1  ; player position, vertical subpixel
+
 playerfacing	.rs 1  ; direction player is facing (0=left, 1=right)
 playerarm_animframe	.rs 1  ; track arm animation frame (0-5)
 playerbobstate	.rs 1  ; tracks state of bobbing animation
@@ -84,14 +103,16 @@ obst3_x			.rs 1
 obst1_y			.rs 1  ; y-pos of obstacles. tracked for collision purposes.
 obst2_y			.rs 1
 obst3_y			.rs 1
+obst_ysubpos	.rs 3  ; y-position subpixel offsets of obstacles (one byte for each)
 
 pkupcollisions	.rs 1  ; pickup collision flags (one per bit)
-pkuplife_flag	.rs 1  ; flag to indicate whether a life pickup has been released
+pkuplife_flag	.rs 1  ; flag to indicate whether a life pickup has been released (to avoid double-spawning)
 pkuplife_x		.rs 1  ; x-pos of life pickup
 pkuplife_y		.rs 1  ; y-pos of life pickup
 pkupcoin_flag	.rs 1  ; flag to indicate whether a coin pickup has been released
 pkupcoin_x		.rs 1  ; x-pos of coin pickup
 pkupcoin_y		.rs 1  ; y-pos of coin pickup
+pkup_ysubpos	.rs 2  ; y-position subpixel offsets of pickups (one byte for each type)
 
 startlatch		.rs 1  ; used to check if start button has been unpressed
 buttonlatch		.rs 1  ; used to check if other buttons have been unpressed
@@ -126,10 +147,8 @@ WALL_BOTTOM		= $A0
 
 PLAYERX_INIT	= $80
 PLAYERY_INIT	= $58
-PLAYERBASESPEED = $02  ; initial horiz speed per frame
 PLAYERINVNC		= 80   ; number of invincibility frames after collision
 
-OBSTBASESPEED	= $01  ; initial upward speed of obstacles
 OBST1_X_INIT	= $30
 OBST2_X_INIT	= $60
 OBST3_X_INIT	= $90
@@ -137,12 +156,12 @@ OBST_REL_INIT	= $50  ; initial release timer value. evenly spaces obstacles (80p
 OBST_RESETY		= $FF  ; reset y-pos for obstacles after wrap, and before initial release
 
 PKUPBASESPEED	= $01  ; initial upward speed of pickups
-;PKUPLIFECHANCE	= 32   ; set to N for a 1/N chance to spawn on each frame (should ideally be a power of 2)
-PKUPLIFEX_INIT	= $20
-PKUPLIFEY_INIT	= $F2
-;PKUPCOINCHANCE	= 3    ; set to N for a 1/N chance to spawn on each frame (should ideally be a power of 2)
+PKUPLIFEX_INIT	= $20  ; initial positions of pickups (on game start and spawn)
+PKUPLIFEY_INIT	= $F0
 PKUPCOINX_INIT	= $A0
-PKUPCOINY_INIT	= $FF
+PKUPCOINY_INIT	= $F0
+PKUPID_LIFE 	= 0	   ; indices for pickups used to index subpixel variables
+PKUPID_COIN 	= 1
 
 PKUP_COLL_LIFE 	= %10000000  ; masks for pkupcollisions
 PKUP_COLL_COIN 	= %01000000
@@ -173,7 +192,7 @@ PAUSED_TEXTY	= $60
 GAMEOVER_TEXTX	= $5C
 GAMEOVER_TEXTY	= $60
 
-; Masks for BIT instructions in button scripts (BIT instruction does not support immed. addressing, so LDA these before use)
+; Masks for BIT instructions in button scripts (BIT instruction does not support immediate addressing, so LDA these before use)
 MASK_A			= %10000000
 MASK_B			= %01000000
 MASK_SELECT		= %00100000
@@ -1084,13 +1103,6 @@ EnginePlayingInit_T_LoadBG:
   STA playerscore+0
   STA playerscore+1					; reset score
   
-;; Set initial diff values ;;
-;; TODO: a way to change these
-  STA diff_fine
-  LDA #1
-  STA diff_coarse
-  LDA #64
-  STA diff_incrate
   
   
 ;; Show game sprites ;;
@@ -1232,7 +1244,6 @@ EnginePlayingInit_T_Mode3Check:		; Night
 EnginePlayingInit_T_ModeDone:
   
   
-  
   RTS  ; end of EnginePlayingInit_T
 
   
@@ -1243,82 +1254,31 @@ EnginePlaying:
   JSR ClockStep
   
   
-;;;; TODO: REMOVE BOTH DIFFICULTY SCRIPTS AND REPLACE WITH SUBPIXEL MOVEMENT SYSTEM
-  
-;; ALT DIFFICULTY UPDATE (WIP)
-;; Difficulty curve: Obstacles move at an average of X + R/N pixels per frame where X is the number of full frame steps taken every second,
-;;   N is # of seconds since level start, and R is the difficultyrate.
-;; We increase fine falling speed every second according to difficultyrate.
-;; The difficultyrate represents the number of seconds it takes to increase one full speed step (frame/sec)
-;; For instance, if difficultyrate = 60, we will move from 1 frame/sec to 2 frames/sec after 60 seconds.
-;; The difficulty will increment from 0 to difficultyrate every second until wrapping.
-;; When difficulty wraps, a full frame/sec will be added to fall rate, and fine steps will reset.
-;; We will use rng to simulate fractional speed steps: a 1/N roll will be made on every frame to determine whether we should move an additional frame.
-
-  
-  LDA clock60		; increment diff variables once every second
-  BNE .DoneDiffUpdate
-  
-  INC diff_fine		; advance fine speed
-  LDA diff_incrate  ; if diff_fine has reached diff_incrate, wrap it and increment diff_coarse
-  CMP diff_fine
-  BCS .DoneDiffUpdate  ; (branch if diff_incrate >= diff_fine)
-  LDA #$00 		
-  STA diff_fine		; if diff_fine has reached diff_incrate, set it back to 0
-  INC diff_coarse
-.DoneDiffUpdate
-
-
-;; Determine how many pixels to move objects this frame
-  JSR prng
-  LDY diff_incrate
-  JSR mod				; get an rng and mod it by diff_incrate
-  CMP diff_fine
-  BCS .NoDoubleMove		; if it is < diff_fine, don't add an extra frame to diff_coarse
-  LDA #$01				; if it is >= diff_fine, add an extra frame to diff_coarse
-  JMP .DoubleMove
-.NoDoubleMove
-  LDA #$00
-.DoubleMove
-  CLC
-  ADC diff_coarse		; whether we added an extra frame or not, add diff_coarse frames
-  STA diff_framespeed	; store the number of pixels objects should move this frame
-  
-  
-  
-  
-  
 ;; Difficulty update
-  LDA difficultyflag			; check difficultyflag. if not 0, don't update
-  BNE DifficultyCurveNoChange	; if flag is 0, we can't raise difficulty any more, so quit
+  LDA difficultyflag		; check difficultyflag. if not 0, don't update
+  BNE .done					; if flag is 0, we can't raise difficulty any more, so quit
+
+  LDA clockSecs+3			; check LSB of clockSecs (max of 256 seconds = 4.27 minutes)
+  LDY difficulty			; check current difficulty index
+  CMP diff_times, y			; compare current time to time for next difficulty transition
+  BCC .done
   
-  LDX clockSecs+3		; check LSB of clockSecs (max of 256 seconds = 4.27 minutes)
-DifficultyCurve1:
-  CPX #45				; after 45 seconds, increase difficulty to 1=Medium
-  BNE DifficultyCurve2
-  LDA #$01
-  STA difficulty		; update difficulty variable
-DifficultyCurve2:
-  CPX #120				; after 2 minutes, increase difficulty to 2=Hard
-  BNE DifficultyCurve3
-  LDA #$02
-  STA difficulty		; update difficulty variable
-DifficultyCurve3:
-  CPX #210				; after 3.5 minutes, increase difficulty to 3=Insane
-  BNE DifficultyCurveNoChange
-  LDA #$01
-  STA difficultyflag	; set difficulty flag to turn off difficulty increase
-  LDA #$03
-  STA difficulty		; update difficulty variable
-DifficultyCurveNoChange:
+  INC difficulty			; if we've reached a transition time, increment difficulty
+  LDY difficulty
+  LDA diff_times, y			; check if next transition time is a 0, in which case, turn off difficulty updating
+  BNE .done
+  LDA 0
+  STA difficultyflag		; set difficulty flag to turn off difficulty increase
+.done:
   
   
 ;; Advance background scroll slower than foreground sprites for parallax effect
+; Obstacles will move the fastest, so check their current speed to decide scroll speed.
   LDA difficulty
-  CMP #$02
-  BCC ScrollSpeedLow	; branch if difficulty < 2 (0 or 1)
-  CMP #$02
-  BCS ScrollSpeedHigh	; branch if difficulty >= 2 (2 or 3)
+  CMP #$10
+  BCC ScrollSpeedLow	; branch if difficulty < $10 (16)
+  CMP #$10
+  BCS ScrollSpeedHigh	; branch if difficulty >= $10 (16)
   
 ScrollSpeedLow:
   LDA clock100
@@ -1351,24 +1311,44 @@ ButtonLeft:
   LDA #MASK_LEFT
   BIT buttons		; get Left button
   BEQ ButtonRight	; skip if bit is 0 (Z=1)
+
+  LDX difficulty	; get current difficulty index
   LDA playerx
-  LDX difficulty	; get difficulty index
   SEC
-  SBC diff_playerspeed, x	; subtract this difficulty's speed factor
+  SBC diff_playerspeed, x	; subtract this difficulty level's pixel speed factor
   STA playerx
+  LDA playerx_sub
+  SEC
+  SBC diff_playerspeed_sub, x	; subtract this difficulty level's subpixel speed factor
+  BCS .nowrap  ; if the subpixel position just wrapped, decrement the whole pixel position
+  DEC playerx
+.nowrap
+  STA playerx_sub
+  
   LDA #$00
   STA playerfacing
+  
 ButtonRight:
   LDA #MASK_RIGHT
   BIT buttons		; get Right button
   BEQ ButtonUp		; skip if bit is 0 (Z=1)
+  
+  LDX difficulty	; get current difficulty index
   LDA playerx
-  LDX difficulty	; get difficulty index
   CLC
-  ADC diff_playerspeed, x	; add this difficulty's speed factor
+  ADC diff_playerspeed, x	; add this difficulty level's pixel speed factor
   STA playerx
+  LDA playerx_sub
+  CLC
+  ADC diff_playerspeed_sub, x	; add this difficulty level's subpixel speed factor
+  BCC .nowrap  ; if the subpixel position just wrapped, increment the whole pixel position
+  INC playerx
+.nowrap
+  STA playerx_sub
+  
   LDA #$01
   STA playerfacing
+  
 ButtonUp:			;; reenable to allow up/down movement
   ;LDA #MASK_UP
   ;BIT buttons		; get Up button
@@ -1377,6 +1357,7 @@ ButtonUp:			;; reenable to allow up/down movement
   ;SEC
   ;SBC #PLAYERBASESPEED
   ;STA playery
+  
 ButtonDown:			;; reenable to allow up/down movement
   ;LDA #MASK_DOWN
   ;BIT buttons		; get Down button
@@ -1742,37 +1723,37 @@ Anim_FlashDone:
 Obst:
 
 ; Check release timers. If timer is 0, move obstacle up.
-  LDY #$00			; reset loop counter
-  LDX #S_OBST1_S1	; start with first sprite in obstacle
-  LDA obst1_release ; check counter
+  LDA #S_OBST1_S1	; start with first sprite in obstacle
+  LDX obst1_release ; check counter
   BEQ Obst1_Go		; if counter is 0, move up
   DEC obst1_release ; if not, decrease counter and hold obstacle back
   JMP Obst1_Done
 Obst1_Go:
-  JSR Obst_MoveUp	; move up
-  STA obst1_y		; update y-pos variable to match
+  LDX #0
+  JSR Obst_MoveUp	; move up (passing sprite offset in A, obst index in X)
+  STA obst1_y		; update y-pos variable to match new obst position
 Obst1_Done:
 
-  LDY #$00			; reset loop counter
-  LDX #S_OBST2_S1	; start with first sprite in obstacle
-  LDA obst2_release ; check counter
+  LDA #S_OBST2_S1	; start with first sprite in obstacle
+  LDX obst2_release ; check counter
   BEQ Obst2_Go		; if counter is 0, move up
   DEC obst2_release ; if not, decrease counter and hold obstacle back
   JMP Obst2_Done
 Obst2_Go:
-  JSR Obst_MoveUp	; move up
-  STA obst2_y		; update y-pos variable to match
+  LDX #1
+  JSR Obst_MoveUp	; move up (passing sprite offset in A, obst index in X)
+  STA obst2_y		; update y-pos variable to match new obst position
 Obst2_Done:
   
-  LDY #$00			; reset loop counter
-  LDX #S_OBST3_S1	; start with first sprite in obstacle
-  LDA obst3_release ; check counter
+  LDA #S_OBST3_S1	; start with first sprite in obstacle
+  LDX obst3_release ; check counter
   BEQ Obst3_Go		; if counter is 0, move up
   DEC obst3_release ; if not, decrease counter and hold obstacle back
   JMP Obst3_Done
 Obst3_Go:
-  JSR Obst_MoveUp	; move up
-  STA obst3_y		; update y-pos variable to match
+  LDX #2
+  JSR Obst_MoveUp	; move up (passing sprite offset in A, obst index in X)
+  STA obst3_y		; update y-pos variable to match new obst position
 Obst3_Done:
 
   
@@ -2007,18 +1988,18 @@ Obst_CollisionDone:
   
 ;; Pickup activation check: Extra life
 Pkup_LifeCheck:
-  LDA pkuplife_flag
-  CMP #$01					; check if life pickup flag is set
-  BNE Pkup_LifeCheckRoll	; if not, roll to set it
-  LDX #S_PKUPLIFE			; if so, load extra life offset into X
+  LDX pkuplife_flag			; check if life pickup spawned flag is set (i.e. pickup on-screen)
+  BEQ Pkup_LifeCheckRoll	; if no pickup is currently released, roll to see if we relase a new one
+  LDA #S_PKUPLIFE			; if so, load extra life offset into A
+  LDX #PKUPID_LIFE			;  and load index for subpixel variables
   JSR Pkup_Move				; move pickup upward
-  STA pkuplife_y			; also update variable
+  STA pkuplife_y			; also update position variable
   
   CMP #UI_CUTOFF			; compare new y-pos (set in A from Pkup_Move) to UI_CUTOFF to check for wrap
   BCS Pkup_LifeCheckDone	; if y-pos > UI_CUTOFF, pickup is still on-screen, so continue to collision check
   
   LDA #$00					; otherwise, a wrap occured. 
-  STA pkuplife_flag			; reset pickup flag
+  STA pkuplife_flag			; reset pickup flag (indicating pickup is no longer on-screen)
   LDA #PKUPLIFEY_INIT		; reset pickup y-pos
   STA (SPRITE_RAM_PKUP+S_PKUPLIFE+0)
   STA pkuplife_y			; also update variable
@@ -2026,28 +2007,30 @@ Pkup_LifeCheck:
   STA (SPRITE_RAM_PKUP+S_PKUPLIFE+3)
   STA pkuplife_x			; also update variable
   JMP Pkup_LifeCheckDone	; done (skip roll)
+
   
-Pkup_LifeCheckRoll:
-  LDA clock60					; roll once per second (60 frames)
+Pkup_LifeCheckRoll:  			
+  LDA clock60  					; only roll once per second (if a life is not spawned)
+  LDY #10
+  JSR mod
   BNE Pkup_LifeCheckDone
-  LDA rng						; 256 possibilities
-  LDX difficulty				; get difficulty index
-  LDY diff_lifespawnrate, x		; mod by N (in lookup table)
-  JSR mod						; 1/N chance of spawning every second
-  CMP #0
-  BNE Pkup_LifeCheckDone   		; if not 0, don't set flag
-  LDA #$01						; if mod was 0 (1/N chance), set pickup flag
-  STA pkuplife_flag
+  LDY difficulty				; get difficulty index
+  LDX diff_lifespawnrate, y		; get N from lookup table
+  JSR RNGRoll					; roll N/256
+  BEQ Pkup_LifeCheckDone  		; if roll was 0, roll failed
+  LDA #$01
+  STA pkuplife_flag				; otherwise, roll succeeded, so set spawned flag (this will begin movement of off-screen pickup on next frame)
 Pkup_LifeCheckDone:
+
 
 ;; Pickup activation check: Coin
 Pkup_CoinCheck:
-  LDA pkupcoin_flag
-  CMP #$01					; check if coin pickup flag is set
-  BNE Pkup_CoinCheckRoll	; if not, roll to set it
-  LDX #S_PKUPCOIN			; load extra coin offset into X
+  LDX pkupcoin_flag			; check if coin pickup spawned flag is set (i.e. pickup on-screen)
+  BEQ Pkup_CoinCheckRoll	; if no pickup is currently released, roll to see if we relase a new one
+  LDA #S_PKUPCOIN			; if so, load coin offset into A
+  LDX #PKUPID_COIN			;  and load index for subpixel variables
   JSR Pkup_Move				; move pickup upward
-  STA pkupcoin_y			; also update variable
+  STA pkupcoin_y			; also update position variable
   
   CMP #UI_CUTOFF			; compare new y-pos (set in A from Pkup_Move) to UI_CUTOFF to check for wrap
   BCS Pkup_CoinCheckDone	; if y-pos is > UI_CUTOFF, pickup is still on-screen, so continue to collision check
@@ -2063,18 +2046,18 @@ Pkup_CoinCheck:
   STA pkupcoin_x			; also update variable
   JMP Pkup_CoinCheckDone	; done (skip roll)
   
+  
 Pkup_CoinCheckRoll:
-  LDA clock60					; roll once per second (60 frames)
+  LDA clock60  					; only roll once per 10 frames (if a coin is not spawned)
+  LDY #10
+  JSR mod
   BNE Pkup_CoinCheckDone
-  JSR prng						; advance prng to prevent overlap with other pickups
-  LDA rng						; 256 possibilities
-  LDX difficulty				; get difficulty index
-  LDY diff_coinspawnrate, x		; mod by N (in lookup table)
-  JSR mod						; 1/N chance of spawning every second
-  CMP #0
-  BNE Pkup_CoinCheckDone   		; if not 0, don't set flag
-  LDA #$01						; if mod was 0 (1/N chance), set pickup flag
-  STA pkupcoin_flag
+  LDY difficulty				; get difficulty index
+  LDX diff_coinspawnrate, y		; get N from lookup table
+  JSR RNGRoll					; roll N/256
+  BEQ Pkup_CoinCheckDone  		; if roll was 0, roll failed
+  LDA #$01
+  STA pkupcoin_flag				; otherwise, roll succeeded, so set spawned flag (this will begin movement of off-screen pickup on next frame)
 Pkup_CoinCheckDone:
 
 
@@ -2422,13 +2405,24 @@ Obst_Init:
   STA obst3_release
   RTS
   
-;; Move y-positions of all sprites in an obstacle up by obstspeed (obstacle passed in through X)
+;; Move y-positions of all sprites in an obstacle up by obstspeed (obst sprite offset passed in A, obst index passed in X)
 Obst_MoveUp:
-  ;;LDY difficulty
-  ;;LDA diff_obstspeed, y
-  LDA diff_framespeed
-  STA tempvar1					; store obstacle speed
+  PHA							; push obst sprite offset in A onto stack for later use
+  LDY difficulty
+  LDA diff_obstspeed, y
+  STA tempvar1					; store obstacle speed (number of pixels to move obst this frame)
+  
+  LDA obst_ysubpos, x			; load subpixel position of this obst
+  CLC
+  ADC diff_obstspeed_sub, y
+  BCC .nowrap
+  INC tempvar1					; if subpixel position wrapped, move obst an extra pixel
+.nowrap:
+  STA obst_ysubpos, x
+
   LDY #0
+  PLA							; pull obst sprite offset back off of stack and transfer back to X
+  TAX
   ; runs 4 times, once for each sprite in obstacle object
 Obst_MoveUpLoop:
   LDA (SPRITE_RAM_OBST+0), x	; load current obst y-pos
@@ -2444,7 +2438,7 @@ Obst_MoveUpLoop:
   BEQ Obst_MoveUpDone
   JMP Obst_MoveUpLoop
 Obst_MoveUpDone:
-  RTS
+  RTS							; last value of obst y-position in A is passed back
   
 ;; Move x-positions of all sprites in each obstacle to match obstN_x's
 Obst_MoveX:
@@ -2511,13 +2505,27 @@ Obst_RandomXGen:
   BCS Obst_RandomXGenNext	; if rng >= 224, get next rng and try again
   RTS
   
-;; Update y-position of a Pickup (pickup passed in through X, returns new y-pos in A)
+;; Update y-position of a Pickup
+ ; Pickup sprite offset passed in A, pickup index (0/1) passed in X, returns new y-pos in A
 Pkup_Move:
-  LDA (SPRITE_RAM_PKUP+0), x	; load a pickup sprite with offset X (set before calling)
+  PHA							; push pickup sprite offset onto stack for later
   LDY difficulty
+  LDA diff_pkupspeed, y			; get number of pixels to move pickup based on difficulty
+  STA tempvar1
+  
+  LDA pkup_ysubpos, x			; load subpixel position of this pickup
+  CLC
+  ADC diff_pkupspeed_sub, y
+  STA pkup_ysubpos, x			; save new subpixel position
+  BCC .nowrap
+  INC tempvar1					; move pickup an extra pixel if subpixel position wraps
+.nowrap:
+  PLA							; pull pickup sprite offset back off of stack
+  TAX
+  LDA (SPRITE_RAM_PKUP+0), x	; load a pickup sprite with offset X (set before calling)
   SEC
-  SBC diff_pickupspeed, y		; decrease y-pos by pkupspeed (depends on difficulty)
-  STA (SPRITE_RAM_PKUP+0), x
+  SBC tempvar1					; decrease y-pos of pickup to move up
+  STA (SPRITE_RAM_PKUP+0), x	; store to move sprite
   RTS
   
 ;; Generate a new x-pos for a pickup
@@ -2594,6 +2602,19 @@ UpdateHighScoreDisplay:
 UpdateHighScoreDisplayDone:
   RTS
   
+  
+;; Check the success of a N/256 roll where N is passed in through X.
+ ; Returns 0/1 in X for fail/success
+RNGRoll:
+  CPX rng
+  ; If rng < N, roll is a success (i.e. if N=1, rng must be 0, thus a 1/256 chance)
+  BCC .rollfail  ; if N < rng, roll fails
+  BEQ .rollfail  ; if N >= rng, but N == rng, roll fails
+  LDX #1  ; if N > rng, roll succeeds. return 1
+  RTS
+.rollfail:
+  LDX #0  ; roll failed. return 0
+  RTS
   
 ;; Advance Clocks ;;
 ClockStep:
@@ -2719,38 +2740,73 @@ BinTable:
   .org $DA00
   
 ; Values for difficulty settings
-diff_playerspeed:
-  .db PLAYERBASESPEED		; speed at difficulty 0
-  .db PLAYERBASESPEED		; speed at difficulty 1
-  .db PLAYERBASESPEED + 1	; speed at difficulty 2
-  .db PLAYERBASESPEED + 2	; speed at difficulty 3
+diff_times:  ; timers for incrementing difficulty. these represent times from 0, so should increase. terminates with 0.
+  ;.db 5, 10, 15, 20, 25, 30, 35, 40, 45, 50, 55, 60, 65, 70, 75, 80
+  ;.db 85, 90, 95, 100, 105, 110, 115, 120, 125, 130, 135, 140, 145, 150, 155, 160
+  ;.db 165, 170, 175, 180, 185, 190, 195, 200, 205, 210, 215, 220, 225, 230, 235, 0
+  .db   3,   6,  10,  14,  18,  22,  26,  30,  33,  36,  39,  42,  45,  48,  51,  54
+  .db  60,  64,  68,  71,  74,  77,  80,  83,  86,  89,  92,  95,  98, 101, 104, 106
+  .db 120, 124, 128, 132, 135, 138, 141, 144, 147, 150, 153, 156, 159, 162, 165, 170
+  .db 185, 200, 220, 250, 0
+  
+
+diff_playerspeed:  ; player speed pixel values
+  ;.db 1, 1, 2, 2, 3
+  .db 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 2, 2
+  .db 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3
+  .db 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4
+  .db 4, 4, 4, 5, 5
+  
+diff_playerspeed_sub:  ; player speed subpixel values (used in parallel with above values)
+  ;.db 0, 128, 0, 128, 0
+  .db 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 0, 16, 32, 48
+  .db 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 0, 16, 32, 48
+  .db 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 0, 16, 32, 48
+  .db 112, 160, 224, 32, 32
+  
 
 diff_obstspeed:
-  .db OBSTBASESPEED			; speed at difficulty 0
-  .db OBSTBASESPEED + 1
-  .db OBSTBASESPEED + 2
-  .db OBSTBASESPEED + 3
+  ;.db 1, 1, 2, 3, 4
+  .db 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2
+  .db 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 3, 3
+  .db 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 4, 4
+  .db 4, 4, 4, 5, 5
+diff_obstspeed_sub:
+  ;.db 0, 192, 128, 64, 0
+  .db 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 0, 16
+  .db 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 0, 16
+  .db 32, 48, 64, 80, 96, 112, 128, 144, 160, 176, 192, 208, 224, 240, 0, 16
+  .db 80, 144, 208, 32, 32
+
   
-diff_pickupspeed:
-  .db $01	; speed at difficulty 0
-  .db $01
-  .db $02
-  .db $03
-  
-diff_coinspawnrate:
-  .db 4		; 1/N chance of spawning at difficulty 0
-  .db 3
-  .db 2
-  .db 2
-  
-diff_lifespawnrate:
-  .db 32	; 1/N chance of spawning at difficulty 0
-  .db 28
-  .db 24
-  .db 16
+; These should be slightly slower than obstacle speeds (?)
+diff_pkupspeed:
+  ;.db 0, 1, 2, 3, 3
+  .db 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1
+  .db 1, 1, 1, 1, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2
+  .db 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3, 3
+  .db 3, 4, 4, 4, 4
+diff_pkupspeed_sub:
+  ;.db 192, 128, 64, 0, 192
+  .db 192, 208, 224, 240, 0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176
+  .db 192, 208, 224, 240, 0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176
+  .db 192, 208, 224, 240, 0, 16, 32, 48, 64, 80, 96, 112, 128, 144, 160, 176
+  .db 224, 16, 64, 96, 96
   
   
-  
+; Spawn rates
+diff_coinspawnrate:  ; N/256 chance of spawning
+  .db 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14, 14
+  .db 16, 16, 16, 16, 16, 16, 16, 16, 16, 16, 18, 18, 18, 18, 18, 18
+  .db 20, 20, 22, 22, 24, 24, 26, 26, 28, 28, 28, 28, 30, 30, 30, 30
+  .db 30, 32, 32, 32, 32
+
+diff_lifespawnrate:  ; N/256 chance of spawning
+  .db 2, 2, 2, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 3, 3
+  .db 4, 4, 4, 4, 4, 4, 4, 4, 6, 6, 6, 6, 6, 6, 6, 6
+  .db 8, 8, 8, 8, 8, 8, 8, 8, 10, 10, 10, 10, 10, 10
+  .db 12, 14, 14, 14, 16
+
   
   .bank 3
   .org $E000
@@ -2766,7 +2822,6 @@ playpalette:
   
 titlepalette:
   ; palettes to load on title screen
-  ; Easter egg: push B to cycle colors.
   ;   day mode	     	sunset mode 	  night mode		extra color (purple)
   .db $0F,$21,$31,$11,  $0F,$27,$37,$17,  $0F,$2D,$20,$0D,  $0F,$22,$32,$12				; background palette
   .db $0F,$21,$31,$11,  $0F,$27,$37,$17,  $0F,$2D,$20,$0D,  $0F,$22,$32,$12				; sprite palette

@@ -40,7 +40,21 @@ se_ve_fallingconstant0A:
   .db $FF  ; end
   
   
-;; For Day theme
+;; For NEW Day theme
+
+se_ve_fallingconstant08:
+  .db $08
+  .db $FF  ; end
+  
+; short fade out
+se_ve_fallingshortfadeout:
+  .db $0A, $0A, $09, $09, $08, $08, $07, $07
+  .db $07, $06, $06, $05, $05, $04, $03, $03
+  .db $02, $01, $00
+  .db $FF  ; end
+
+  
+;; For OLD Day theme
 
 ; quick, quiet snare
 se_ve_fallingsnare2:

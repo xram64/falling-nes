@@ -134,11 +134,14 @@ volume_envelopes:
   .dw se_ve_drumhat3
   .dw se_ve_drumhat4
   .dw se_ve_drumcrash1
+  .dw se_ve_drumcrash2
   .dw se_ve_fallinghat1
   .dw se_ve_fallingsnare1
   .dw se_ve_fallingLFO1
   .dw se_ve_fallingLFO2
   .dw se_ve_fallingconstant0A
+  .dw se_ve_fallingconstant08
+  .dw se_ve_fallingshortfadeout
   .dw se_ve_fallingsnare2
   .dw se_ve_fallingkick1
   .dw se_ve_fallingfadeout
@@ -160,14 +163,17 @@ ve_drumhat2		= $0D
 ve_drumhat3		= $0E
 ve_drumhat4		= $0F
 ve_drumcrash1	= $10
-ve_fallinghat1			= $11
-ve_fallingsnare1 		= $12
-ve_fallingLFO1			= $13
-ve_fallingLFO2			= $14
-ve_fallingconstant0A 	= $15
-ve_fallingsnare2 		= $16
-ve_fallingkick1 		= $17
-ve_fallingfadeout 		= $18
+ve_drumcrash2	= $11
+ve_fallinghat1			= $12
+ve_fallingsnare1 		= $13
+ve_fallingLFO1			= $14
+ve_fallingLFO2			= $15
+ve_fallingconstant0A 	= $16
+ve_fallingconstant08 	= $17
+ve_fallingshortfadeout 	= $18
+ve_fallingsnare2 		= $19
+ve_fallingkick1 		= $1A
+ve_fallingfadeout 		= $1B
 
 ; Opcode jump table
 sound_opcodes:

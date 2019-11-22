@@ -27,3 +27,18 @@ To assemble from source, run `NESASM3 falling.asm` using the NESASM v3.1 assembl
 
 ### Music
 - [Falling - Title Theme](https://soundcloud.com/zenakumusic/falling-title-theme)
+
+## Changelog
+
+### v1.0 [1/6/18]
+- Finished original project.
+
+### v1.01 [1/10/19]
+- Minor refactoring and difficulty tweaks.
+
+### v1.1 [11/24/19]
+- Smoothed out difficulty curve.
+    - Adapted movement code for player, obstacles, and pickups to use a basic subpixel system.
+    - Difficulty now ramps up in ~50 incremental steps from game start to reach max speed by 255 seconds.
+    - Decreased spawn rates of pickups. Spawn rates also increase with difficulty curve.
+- Replaced Day mode music with a new track.

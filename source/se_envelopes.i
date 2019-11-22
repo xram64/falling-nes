@@ -90,5 +90,10 @@ se_ve_drumhat4:
 se_ve_drumcrash1:
   .db $0F, $0F, $0E, $0D, $0B, $09, $05, $03, $00
   .db $FF  ; end
+  
+; Quieter crash cymbal envelope
+se_ve_drumcrash2:
+  .db $0A, $0A, $09, $08, $06, $05, $03, $02, $00
+  .db $FF  ; end
 
   

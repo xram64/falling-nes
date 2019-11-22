@@ -1,4 +1,5 @@
-themeDayTempo = $64  ; starting tempo (175 bpm)
+themeDayTempo = $55  ; starting tempo (150 bpm)
+
 ;; Stream header format:
  ; 
  ; Stream number (MUSIC_SQ1, MUSIC_SQ2, MUSIC_TRI, MUSIC_NOI, SFX_1, or SFX_2)
@@ -15,15 +16,15 @@ themeDay_header:
   .db MUSIC_SQ1
   .db $01
   .db SQUARE_1
-  .db %10110000
-  .db ve_stac2
+  .db %01110000
+  .db ve_drumcrash2
   .dw themeDay_square1
   .db themeDayTempo
   
   .db MUSIC_SQ2
   .db $01
   .db SQUARE_2
-  .db %10110000
+  .db %11110000
   .db ve_fallingfadeout
   .dw themeDay_square2
   .db themeDayTempo
@@ -44,169 +45,308 @@ themeDay_header:
   .dw themeDay_noi
   .db themeDayTempo
   
-  ; This track is in 3/4, so each bar only has 3 quarter notes.
-  
 themeDay_square1:
 
-  ; intro (4 bars)
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
-
 .infloop
-
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
+  .db n_8
   
-  .db n_4, F3, n_16, A3, rr, rr, rr, n_4, A3
-  .db n_4, F3, n_16, A3, rr, rr, rr, n_4, A3
+  .db loopfor, 4
+.loopA
+  .db F3, E3, C3
+  .db F3, E3, C3
+  .db F3, E3
+  .db loopto
+  .dw .loopA
   
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
+  .db loopfor, 3
+.loopB
+  .db F3, E3, C3
+  .db F3, E3, C3
+  .db F3, E3
+  .db loopto
+  .dw .loopB
   
-  .db n_2, D4, n_4, C4
-  .db B3, G3, F3
-
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
-  .db n_4, G3, n_16, C4, rr, rr, rr, n_4, C4
+  .db F3, E3, C3
+  .db F3, G3, F3
+  .db E3, C3
   
-  .db n_4, D4, n_16, A3, rr, rr, rr, n_4, A3
-  .db n_4, D4, n_16, A3, rr, rr, rr, n_4, A3
-  
-  .db n_4, B3, G3, F3, E3, D3, B2
-  .db C3, n_8, C4, rr, n_4, C4
-  .db C3, n_8, C4, rr, n_4, C4
-
   .db inf_loopto
   .dw .infloop
   .db endsound
+  
+  
   
 themeDay_square2:
-  
-  ; intro (4 bars)
-  .db n_d2, rr, rr, rr, rr
-  
-.infloop
 
-  ; section 1 (12 bars)
-  .db n_32, C5, D5, n_d8, E5, n_4, E5, G4
-  .db n_2, D5, n_4, C5
-  .db n_d2, A4
-  .db rr
+.infloop
   
-  .db n_4, E4, A4, C5
-  .db n_4, D5, E5, D5
-  .db n_d2, C5
-  .db B4
+  .db n_8
   
-  .db n_2, E5, n_4, C5
-  .db n_2, D5, n_4, C5
-  .db n_d2, F5
-  .db n_4, rr, G4, E4
+  .db change_ve, ve_fallingLFO1
   
-  .db n_4, A4, C5, D5
-  .db E5, D5, B4
-  .db n_d2, C5, rr
+  .db rr, C4, E4, F4, rr, rr, rr, rr
+  .db rr, C4, E4, F4, rr, rr, rr, rr
+  .db rr, A3, C4, E4, rr, rr, rr, rr
+  .db rr, A3, C4, E4, F4, E4, D4, C4
   
-  ; section 2 (12 bars)
-  .db n_32, C5, D5, n_d8, E5, n_4, E5, G4
-  .db n_2, D5, n_4, C5
-  .db n_d2, A4
-  .db rr
+  .db rr, C4, E4, F4, rr, rr, rr, rr
+  .db rr, C4, E4, F4, rr, rr, rr, rr
+  .db rr, A3, C4, E4, rr, rr, rr, rr
+  .db A3, C4, E4, F4, G4, F4, E4, C4
   
-  .db n_4, E4, A4, C5
-  .db n_4, E5, D5, C5
-  .db n_d2, G5
-  .db n_4, F5, E5, D5
+  .db rr, C4, E4, F4, rr, rr, rr, rr
+  .db rr, C4, E4, F4, rr, rr, rr, rr
+  .db rr, A3, C4, E4, rr, rr, rr, rr
+  .db rr, A3, C4, E4, F4, E4, D4, C4
   
-  .db n_2, E5, n_4, C5
-  .db n_2, D5, n_4, C5
-  .db n_2, E5, n_4, D5
-  .db n_4, C5, B4, A4
+  .db C4, E4, F4, rr, rr, F4, rr, F4
+  .db C4, E4, F4, D4, rr, C4, rr, C4
+  .db rr, A3, C4, E4, rr, rr, rr, E4
+  .db C4, A3, C4, E4, G4, F4, E4, C4
   
-  .db n_4, G4, C5, D5
-  .db E5, D5, B4
-  .db n_d2, C5, rr
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   
+  .db change_ve, ve_fallingfadeout
   
+  .db C4, E4, F4, C4, E4, F4, C4, E4
+  .db C4, E4, F4, C4, E4, F4, C4, E4
+  .db C4, E4, F4, C4, E4, F4, C4, E4
+  .db C4, E4, F4, C4, G4, F4, E4, C4
+  
+  .db C4, E4, F4, C4, E4, F4, C4, E4
+  .db C4, E4, F4, C4, E4, F4, C4, E4
+  .db C4, E4, F4, C4, E4, F4, C4, E4
+  .db C4, E4, F4, C4, F4, E4, C4, rr
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+  .db change_ve, ve_fallingfadeout
+  
+  .db G4, rr, G4, G4, rr, A4, rr, G4
+  .db rr, rr, F4, rr, E4, rr, C4, rr
+  .db D4, rr, D4, D4, rr, E4, rr, D4
+  .db rr, rr, rr, rr, rr, rr, rr, rr
+  
+  .db G4, rr, G4, G4, rr, A4, rr, G4
+  .db rr, rr, C5, rr, D5, rr, C5, rr
+  .db E5, rr, C5, C5, rr, G4, rr, G4
+  .db rr, F4, E4, F4, E4, D4, C4, rr
+  
+  .db change_ve, ve_fallingshortfadeout
+  
+  .db n_4, G4, n_8, G4, n_4, G4, A4, n_d4, G4
+  .db n_4, F4, E4, C4
+  .db n_4, D4, n_8, D4, n_4, D4, E4, change_ve, ve_fallingfadeout, n_1, D4
+  .db n_8, rr, change_ve, ve_fallingshortfadeout
+  
+  .db n_4, G4, n_8, G4, n_4, G4, A4, n_d4, G4
+  .db n_4, C5, D5, C5
+  .db n_4, E5, n_8, C5, n_4, C5, G4, n_4, G4
+  .db n_8, F4, E4, F4, E4, D4, C4, C4
+  
+  ; .db G4, rr, G4, G4, rr, A4, rr, G4
+  ; .db rr, rr, F4, rr, E4, rr, C4, rr
+  ; .db D4, rr, D4, D4, rr, E4, rr, D4
+  ; .db rr, rr, rr, rr, rr, rr, rr, rr
+  
+  ; .db G4, rr, G4, G4, rr, A4, rr, G4
+  ; .db rr, rr, C5, rr, D5, rr, C5, rr
+  ; .db E5, rr, C5, C5, rr, G4, rr, G4
+  ; .db rr, F4, E4, F4, E4, D4, C4, rr
+  
+
   .db inf_loopto
   .dw .infloop
+  
   .db endsound
+  
+  
   
 themeDay_tri:
 
-  ; intro (4 bars)
-  .db n_4, rr, n_8, C5, B4, C5, rr
-  .db n_4, rr, n_8, C5, B4, C5, rr
-  .db n_4, rr, n_8, C5, B4, C5, rr
-  .db n_4, rr, n_8, C5, rr, C5, rr
-  
 .infloop
-  ; section 1 (12 bars)
-  .db n_4, rr, n_8, A5, Gs5, A5, rr
-  .db n_4, rr, n_8, A5, Gs5, A5, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
   
-  .db n_4, rr, n_8, D6, Cs6, D6, rr
-  .db n_4, rr, n_8, A5, Gs5, A5, rr
-  .db n_4, rr, n_8, Fs5, rr, Fs5, rr
-  .db n_4, G5, rr, rr
+  .db n_1
+  .db F3, D3, C3
+  .db n_2
+  .db D3, E3
   
-  .db n_4, rr, n_8, G5, Fs5, G5, rr
-  .db n_4, rr, n_8, G5, Fs5, G5, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  
-  .db n_4, rr, n_8, D6, Cs6, D6, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  .db n_8, rr, rr, E6, rr, E6, rr
-  .db n_4, C6, rr, rr
-  
-  ; section 2 (12 bars)
-  .db n_4, rr, n_8, A5, Gs5, A5, rr
-  .db n_4, rr, n_8, A5, Gs5, A5, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  
-  .db n_4, rr, n_8, D6, Cs6, D6, rr
-  .db n_4, rr, n_8, A5, Gs5, A5, rr
-  .db n_4, rr, n_8, As5, rr, As5, rr	; only change
-  .db n_4, B5, rr, rr					; only change
-  
-  .db n_4, rr, n_8, G5, Fs5, G5, rr
-  .db n_4, rr, n_8, G5, Fs5, G5, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  
-  .db n_4, rr, n_8, D6, Cs6, D6, rr
-  .db n_4, rr, n_8, B5, As5, B5, rr
-  .db n_8, rr, rr, E6, rr, E6, rr
-  .db n_4, C6, rr, rr
-  
+  .db n_1
+  .db F3, D3, C3
+  .db n_2
+  .db D3, G3
+
   .db inf_loopto
   .dw .infloop
+
   .db endsound
+  
+  
   
 themeDay_noi:
-  
-  ; intro (4 bars)
-  .db n_8, change_ve, ve_fallingkick1, kick2, rr, n_4, rr, rr
-  .db n_8, change_ve, ve_fallingsnare2, snare2, rr, n_4, rr, rr
-  .db n_8, change_ve, ve_fallingkick1, kick2, rr, n_4, rr, rr
-  .db n_8, change_ve, ve_fallingsnare2, snare2, rr
-  .db      change_ve, ve_fallingkick1, kick2, rr
-  .db      change_ve, ve_fallingsnare2, snare2, rr
-  
-.infloop
 
-  .db n_8, change_ve, ve_fallingkick1, kick2, rr, change_ve, ve_fallingsnare2, snare2, rr, snare2, rr
-  .db n_8, rr, rr, snare2, rr, snare2, rr
+.infloop
+  .db n_1, change_ve, ve_muted, rr, rr, rr, rr, rr, rr, rr, rr
   
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, kick2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1
+  .db n_16, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, kick2, rr
+  
+  ;;;;;;;;;;;;;;;;
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, kick2, kick2, n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, n_8, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1
+  .db n_16, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, kick2, rr
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+  .db loopfor, 2
+.loopA
+  .db n_16, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumhat4, snare3, n_8, change_ve, ve_drumcrash2, hat2
+  
+  .db n_16, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  
+  .db n_16, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumhat4, snare3, n_8, change_ve, ve_drumcrash2, hat2
+  
+  .db n_16, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3, change_ve, ve_drumsnare2, kick2, change_ve, ve_drumhat4, snare3
+  .db n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumhat4, snare3, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumhat4, snare3
+  
+  .db loopto
+  .dw .loopA
+  
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+  .db n_8, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, rr, n_16, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, kick2, kick2, change_ve, ve_fallingsnare1, snare1, n_16, change_ve, ve_drumsnare2, kick2, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1
+  .db n_16, rr, change_ve, ve_drumsnare2, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1
+  .db n_16, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, kick2, rr
+  
+  ;;;;;;;;;;;;;;;; (above and below patterns are identical)
+  
+  .db n_8, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, rr, n_16, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, kick2, kick2, change_ve, ve_fallingsnare1, snare1, n_16, change_ve, ve_drumsnare2, kick2, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1
+  .db n_16, rr, change_ve, ve_drumsnare2, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1
+  .db n_16, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, kick2, rr
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, kick2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1
+  .db n_16, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, kick2, rr
+  
+  ;;;;;;;;;;;;;;;;
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, kick2, kick2, n_16, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, n_8, kick2
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, rr
+  .db n_8, change_ve, ve_drumsnare2, kick2, change_ve, ve_fallingsnare1, snare1, rr
+  
+  .db n_4, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2
+  .db n_8, change_ve, ve_fallingsnare1, snare1
+  .db n_16, change_ve, ve_drumsnare2, kick2, kick2, change_ve, ve_fallingsnare1, snare1, change_ve, ve_drumsnare2, kick2, kick2, rr
+  
+  ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
   
   .db inf_loopto
   .dw .infloop
+  
   .db endsound
+
+
+
+
+
+
+
 
 
